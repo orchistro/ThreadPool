@@ -42,6 +42,13 @@ class TaskQueue
             }
         }
 
+        void push(Task&& aTask)
+        {
+            std::unique_lock sLock(mMutex);
+
+            mQueue.push(std::forward<Task>(aTask));
+        }
+
     private:
         std::queue<Task> mQueue;
         std::mutex mMutex;
@@ -118,11 +125,11 @@ class ThreadPool
                     using namespace std::chrono_literals;
 
                     std::unique_lock sLock(mMutex);
-                    mCond.wait_for(sLock, 500ms, [this]{return this->mRun;});
+                    mCond.wait_for(sLock, 600ms, [this]{return (this->mRun == false);});
                 }
             }
 
-            DEBUG("End " << std::this_thread::get_id() << "(");
+            DEBUG("End " << std::this_thread::get_id());
         }
 
         ThreadPool(const ThreadPool&) = delete;
@@ -140,6 +147,12 @@ class ThreadPool
                 DEBUG("Joining " << sThr.mThread.get_id());
                 sThr.mThread.join();
             }
+        }
+
+        void push(std::function<void(int)>&& aFunc)
+        {
+            mTaskQueue.push(std::forward<std::function<void(int)>>(aFunc));
+            mCond.notify_one();
         }
 
         const size_t size(void) const
