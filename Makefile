@@ -15,7 +15,7 @@ $(DEPS): %.d: %.cpp
 	gcc -std=c++17 -MM -MT $(@:%.d=%.o) $< > $@
 
 %.o: %.cpp
-	gcc -std=c++17 -c -g -pthread -O0 -Wall -Werror -fext-numeric-literals -o $@ $<
+	gcc -std=c++17 -c -g -pthread -O0 -Wall -Werror -o $@ $<
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPS)

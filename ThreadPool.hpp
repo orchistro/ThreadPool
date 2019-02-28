@@ -2,7 +2,7 @@
  * vim:ts=4:shiftwidth=4:et:cindent:fileencoding=utf-8:
  */
 
-#pragma once
+#pragma once    // should be ok with both llmv and gcc
 
 #include <thread>
 #include <vector>
