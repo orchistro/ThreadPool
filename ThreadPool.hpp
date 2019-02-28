@@ -122,5 +122,10 @@ class ThreadPool
                 sThr.mThread.join();
             }
         }
+
+        const size_t size(void) const
+        {
+            return mThrCnt;
+        }
 };
 
