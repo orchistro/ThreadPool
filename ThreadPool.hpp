@@ -49,14 +49,21 @@ class TaskQueue
 class ThreadStruct
 {
     public:
+        const std::string mName;
+        std::thread mThread;
+
+    public:
         template <typename Func, typename... Args>
-        ThreadStruct(const std::string& aName, Func&& aFunc, Args... args) : mName(aName), mThread(aFunc, args...)
+        ThreadStruct(const std::string& aName, Func&& aFunc, Args&&... aArgs)
+            : mName(aName), mThread(std::forward<Func>(aFunc), std::forward<Args>(aArgs)...)
         {
         }
 
-    public:
-        const std::string mName;
-        std::thread mThread;
+        ThreadStruct(const ThreadStruct&) = delete;
+        ThreadStruct& operator=(const ThreadStruct&) = delete;
+
+        ThreadStruct(ThreadStruct&&) = default;
+        ThreadStruct& operator=(ThreadStruct&&) = default;
 };
 
 class ThreadPool
