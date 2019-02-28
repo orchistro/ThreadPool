@@ -12,6 +12,7 @@
 #include <mutex>
 #include <functional>
 #include <condition_variable>
+#include <atomic>
 
 inline std::mutex gOutMutex;
 
@@ -46,16 +47,22 @@ class TaskQueue
         std::mutex mMutex;
 };
 
+enum class ThreadState
+{
+    IDLE,
+    RUNNING
+};
+
 class ThreadStruct
 {
     public:
-        const std::string mName;
         std::thread mThread;
+        ThreadState mState = ThreadState::IDLE;
 
     public:
         template <typename Func, typename... Args>
-        ThreadStruct(const std::string& aName, Func&& aFunc, Args&&... aArgs)
-            : mName(aName), mThread(std::forward<Func>(aFunc), std::forward<Args>(aArgs)...)
+        ThreadStruct(Func&& aFunc, Args&&... aArgs)
+            : mThread(std::forward<Func>(aFunc), std::forward<Args>(aArgs)..., this)
         {
         }
 
@@ -69,7 +76,7 @@ class ThreadStruct
 class ThreadPool
 {
     private:
-        size_t mThrCnt;
+        const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
         TaskQueue<std::function<void(int)>> mTaskQueue;
@@ -79,6 +86,8 @@ class ThreadPool
 
         bool mRun = true;  // asuming it is ok not to be atomic.
 
+        std::atomic<size_t> mRunningCnt = 0;
+
     public:
         ThreadPool(const size_t aThrCnt) : mThrCnt(aThrCnt)
         {
@@ -86,12 +95,11 @@ class ThreadPool
 
             for (size_t i = 0; i < aThrCnt; i++)
             {
-                std::string sName{"Thr"};
-                mThrList.emplace_back(sName + std::to_string(i), &ThreadPool::threadMain, this);
+                mThrList.emplace_back(&ThreadPool::threadMain, this);
             }
         }
 
-        void threadMain(void)
+        void threadMain(ThreadStruct* aStatus)
         {
             DEBUG("Thread " << std::this_thread::get_id());
 
@@ -99,7 +107,11 @@ class ThreadPool
             {
                 if (auto sTask = mTaskQueue.pop(); sTask.has_value() == true)
                 {
+                    aStatus->mState = ThreadState::RUNNING;
+                    mRunningCnt++;
                     (*sTask)(0);
+                    mRunningCnt--;
+                    aStatus->mState = ThreadState::IDLE;
                 }
                 else
                 {
@@ -110,7 +122,7 @@ class ThreadPool
                 }
             }
 
-            DEBUG("End " << std::this_thread::get_id());
+            DEBUG("End " << std::this_thread::get_id() << "(");
         }
 
         ThreadPool(const ThreadPool&) = delete;
@@ -125,7 +137,7 @@ class ThreadPool
 
             for (auto& sThr : mThrList)
             {
-                DEBUG("Joining " << sThr.mThread.get_id() << "(" << sThr.mName << ")");
+                DEBUG("Joining " << sThr.mThread.get_id());
                 sThr.mThread.join();
             }
         }
@@ -133,6 +145,15 @@ class ThreadPool
         const size_t size(void) const
         {
             return mThrCnt;
+        }
+
+        const size_t getIdleCount(void) const
+        {
+            return mThrCnt - mRunningCnt;
+        }
+        const size_t getRunningCount(void) const
+        {
+            return mRunningCnt;
         }
 };
 
