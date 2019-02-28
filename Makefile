@@ -9,13 +9,13 @@ OBJS := $(SRCS:.cpp=.o)
 DEPS := $(SRCS:.cpp=.d)
 
 foo: $(OBJS)
-	gcc -o $@ $^ -lstdc++ -pthread
+	$(CXX) -o $@ $^ -lstdc++ -pthread
 
 $(DEPS): %.d: %.cpp
-	gcc -std=c++17 -MM -MT $(@:%.d=%.o) $< > $@
+	$(CXX) -std=c++17 -MM -MT $(@:%.d=%.o) $< > $@
 
 %.o: %.cpp
-	gcc -std=c++17 -c -g -pthread -O0 -Wall -Werror -o $@ $<
+	$(CXX) -std=c++17 -c -g -pthread -O0 -Wall -Werror -o $@ $<
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPS)
