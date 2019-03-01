@@ -90,7 +90,7 @@ class ThreadPool
         const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
-        TaskQueue<std::packaged_task<int64_t(int64_t)>> mTaskQueue;
+        TaskQueue<std::packaged_task<int64_t(void)>> mTaskQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
@@ -120,7 +120,7 @@ class ThreadPool
                 {
                     aStatus->mState = ThreadState::RUNNING;
                     mRunningCnt++;
-                    (*sPackagedTask)((((int64_t)pthread_self()) % 1000));
+                    (*sPackagedTask)();
                     mRunningCnt--;
                     aStatus->mState = ThreadState::IDLE;
                 }
@@ -153,11 +153,11 @@ class ThreadPool
             }
         }
 
-        std::future<int64_t> push(std::function<int64_t(int64_t)>&& aFunc)
+        std::future<int64_t> push(std::function<int64_t(int64_t)>&& aFunc, const int64_t aFirstArg)
         {
-            std::packaged_task<int64_t(int64_t)> sPackTask{std::forward<std::function<int64_t(int64_t)>>(aFunc)};
-            std::future<int64_t> f{sPackTask.get_future()};
-            mTaskQueue.push(std::move(sPackTask));
+            std::packaged_task<int64_t(void)> sPackage{std::bind(aFunc, aFirstArg)};
+            std::future<int64_t> f{sPackage.get_future()};
+            mTaskQueue.push(std::move(sPackage));
             mCond.notify_one();
             return f;
         }

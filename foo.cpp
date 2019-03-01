@@ -16,9 +16,9 @@ int main(void)
         return id;
     };
 
-    std::future<int64_t> f1 = tp.push(f);
-    std::future<int64_t> f2 = tp.push(f);
-    std::future<int64_t> f3 = tp.push(f);
+    std::future<int64_t> f1 = tp.push(f, 10);
+    std::future<int64_t> f2 = tp.push(f, 20);
+    std::future<int64_t> f3 = tp.push(f, 30);
 
     std::this_thread::sleep_for(10s);
 
