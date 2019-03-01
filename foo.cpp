@@ -8,14 +8,17 @@ int main(void)
 
     ThreadPool tp(3);
 
-    tp.push([](int){DEBUG("1begin");std::this_thread::sleep_for(1s);DEBUG("1end");return 1;});
-    std::this_thread::sleep_for(200ms);
-    tp.push([](int){DEBUG("2begin");std::this_thread::sleep_for(1.5s);DEBUG("2end");return 2;});
+    auto f = [](int64_t id) -> void {
+        DEBUG("BEGIN " << id);
+        std::this_thread::sleep_for(std::chrono::milliseconds(id));
+        DEBUG("END" << id);
+    };
 
-    for (size_t i = 0; i < 3; i++)
-    {
-        std::this_thread::sleep_for(1s);
-    }
+    tp.push(f);
+    tp.push(f);
+    tp.push(f);
+
+    std::this_thread::sleep_for(10s);
 
     tp.stop();
 

@@ -13,6 +13,10 @@
 #include <functional>
 #include <condition_variable>
 #include <atomic>
+#include <cstdint>
+#include <future>
+
+#include <pthread.h>
 
 inline std::mutex gOutMutex;
 
@@ -36,7 +40,7 @@ class TaskQueue
             }
             else
             {
-                auto sTask = mQueue.front();
+                auto sTask = std::move(mQueue.front());
                 mQueue.pop();
                 return sTask;
             }
@@ -86,7 +90,7 @@ class ThreadPool
         const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
-        TaskQueue<std::function<void(int)>> mTaskQueue;
+        TaskQueue<std::packaged_task<void(int64_t)>> mTaskQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
@@ -112,11 +116,11 @@ class ThreadPool
 
             while (mRun == true)
             {
-                if (auto sTask = mTaskQueue.pop(); sTask.has_value() == true)
+                if (auto sPackagedTask = mTaskQueue.pop(); sPackagedTask.has_value() == true)
                 {
                     aStatus->mState = ThreadState::RUNNING;
                     mRunningCnt++;
-                    (*sTask)(0);
+                    (*sPackagedTask)((((int64_t)pthread_self()) % 1000));
                     mRunningCnt--;
                     aStatus->mState = ThreadState::IDLE;
                 }
@@ -149,9 +153,10 @@ class ThreadPool
             }
         }
 
-        void push(std::function<void(int)>&& aFunc)
+        void push(std::function<void(int64_t)>&& aFunc)
         {
-            mTaskQueue.push(std::forward<std::function<void(int)>>(aFunc));
+            std::packaged_task<void(int64_t)> sPackTask{std::forward<std::function<void(int64_t)>>(aFunc)};
+            mTaskQueue.push(std::move(sPackTask));
             mCond.notify_one();
         }
 
