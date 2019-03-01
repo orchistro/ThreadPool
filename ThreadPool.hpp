@@ -153,13 +153,14 @@ class ThreadPool
             }
         }
 
-        std::future<int64_t> push(std::function<int64_t(int64_t)>&& aFunc, const int64_t aFirstArg)
+        template <typename Func, typename ...ArgType>
+        auto push(Func&& aFunc, ArgType&&... aArgs) -> std::future<decltype(aFunc(aArgs...))>
         {
-            std::packaged_task<int64_t(void)> sPackage{std::bind(aFunc, aFirstArg)};
-            std::future<int64_t> f{sPackage.get_future()};
+            std::packaged_task<int64_t(void)> sPackage{std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...)};
+            std::future<decltype(aFunc(aArgs...))> sFuture{sPackage.get_future()};
             mTaskQueue.push(std::move(sPackage));
             mCond.notify_one();
-            return f;
+            return sFuture;
         }
 
         const size_t size(void) const
