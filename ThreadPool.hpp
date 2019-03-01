@@ -90,7 +90,7 @@ class ThreadPool
         const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
-        TaskQueue<std::packaged_task<void(int64_t)>> mTaskQueue;
+        TaskQueue<std::packaged_task<int64_t(int64_t)>> mTaskQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
@@ -153,11 +153,13 @@ class ThreadPool
             }
         }
 
-        void push(std::function<void(int64_t)>&& aFunc)
+        std::future<int64_t> push(std::function<int64_t(int64_t)>&& aFunc)
         {
-            std::packaged_task<void(int64_t)> sPackTask{std::forward<std::function<void(int64_t)>>(aFunc)};
+            std::packaged_task<int64_t(int64_t)> sPackTask{std::forward<std::function<int64_t(int64_t)>>(aFunc)};
+            std::future<int64_t> f{sPackTask.get_future()};
             mTaskQueue.push(std::move(sPackTask));
             mCond.notify_one();
+            return f;
         }
 
         const size_t size(void) const
