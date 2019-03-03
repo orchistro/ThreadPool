@@ -2,26 +2,35 @@
 
 #include "ThreadPool.hpp"
 
-std::string func1(int32_t a, int32_t b)
+static std::string func4(int32_t a, int32_t b)
 {
-    DEBUG("BEGIN func1");
-    DEBUG("END func1");
+    DEBUG("BEGIN func4");
+    DEBUG("END func4");
     return std::to_string(a + b);
 }
 
-static int64_t func2(int32_t a, int32_t b, int32_t c, std::string* aOutputStr)
+static int64_t func5(int32_t a, int32_t b, int32_t c, std::string* aOutputStr)
 {
-    DEBUG("BEGIN func2");
+    DEBUG("BEGIN func5");
     int64_t res = a * b * c;
     *aOutputStr = std::to_string(res);
-    DEBUG("END func2");
+    DEBUG("END func5");
     return res;
 }
 
-void func3(void)
+void func6(void)
 {
-    DEBUG("BEGIN func3");
-    DEBUG("END func3");
+    DEBUG("BEGIN func6");
+    DEBUG("END func6");
+}
+
+static int64_t func8(int32_t a, int32_t b, int32_t c, std::string& aOutputStr)
+{
+    DEBUG("BEGIN func8");
+    int64_t res = a * b * c;
+    aOutputStr = "output:" + std::to_string(res);
+    DEBUG("END func8");
+    return res;
 }
 
 int main(void)
@@ -43,15 +52,18 @@ int main(void)
     std::future<int64_t> f3 = tp.push(lambda1, 30);
 
     // compilation error. culprit: return type
-    // std::future<std::string> f4 = tp.push(func1, 20, 10);
+    std::future<std::string> f4 = tp.push(func4, 20, 10);
 
     std::string s;
-    auto f5 = tp.push(func2, 30, 20, 10, &s);
+    auto f5 = tp.push(func5, 30, 20, 10, &s);
 
     // compilation error. culprit: return type
-    // std::future<void> f6 = tp.push(func3);
+    std::future<void> f6 = tp.push(func6);
 
-    auto f7 = tp.push([](void) -> int64_t {return 100;});
+    auto f7 = tp.push([](void) -> int64_t {DEBUG("func7");return 100;});
+
+    std::string s2;
+    auto f8 = tp.push(func8, 30, 20, 10, std::ref(s2));
 
     std::this_thread::sleep_for(10s);
 
@@ -60,10 +72,12 @@ int main(void)
     DEBUG("f1:" << f1.get());
     DEBUG("f2:" << f2.get());
     DEBUG("f3:" << f3.get());
-    // DEBUG("f4:" << f4.get());
+    DEBUG("f4:" << f4.get());
     DEBUG("f5:" << f5.get());
     DEBUG("s:" << s);
     DEBUG("f7:" << f7.get());
+    DEBUG("f8:" << f8.get());
+    DEBUG("s2:" << s2);
 
     return 0;
 }

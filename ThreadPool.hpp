@@ -90,7 +90,7 @@ class ThreadPool
         const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
-        TaskQueue<std::packaged_task<int64_t(void)>> mTaskQueue;
+        TaskQueue<std::function<void(void)>> mTaskQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
@@ -116,11 +116,11 @@ class ThreadPool
 
             while (mRun == true)
             {
-                if (auto sPackagedTask = mTaskQueue.pop(); sPackagedTask.has_value() == true)
+                if (auto sTaskWrapper = mTaskQueue.pop(); sTaskWrapper.has_value() == true)
                 {
                     aStatus->mState = ThreadState::RUNNING;
                     mRunningCnt++;
-                    (*sPackagedTask)();
+                    (*sTaskWrapper)();
                     mRunningCnt--;
                     aStatus->mState = ThreadState::IDLE;
                 }
@@ -156,10 +156,18 @@ class ThreadPool
         template <typename Func, typename ...ArgType>
         auto push(Func&& aFunc, ArgType&&... aArgs) -> std::future<decltype(aFunc(aArgs...))>
         {
-            std::packaged_task<int64_t(void)> sPackage{std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...)};
-            std::future<decltype(aFunc(aArgs...))> sFuture{sPackage.get_future()};
-            mTaskQueue.push(std::move(sPackage));
+            auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);
+
+            // Need to use shared_ptr to avoid compile error in clang:
+            // https://bugs.llvm.org/show_bug.cgi?id=38325
+            auto sPackage = std::make_shared<std::packaged_task<decltype(aFunc(aArgs...))(void)>>(std::move(sFuncWithArgs));
+            auto sFuture{sPackage->get_future()};
+
+            auto sTaskWrapper = [sPackage](void) -> void { (*sPackage)(); };
+
+            mTaskQueue.push(std::move(sTaskWrapper));
             mCond.notify_one();
+
             return sFuture;
         }
 
