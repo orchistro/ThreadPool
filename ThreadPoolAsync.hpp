@@ -20,6 +20,12 @@
 
 #include "debug.hpp"
 
+template <typename Func, typename ...Args>
+concept bool VoidFunc = requires(Func f, Args... args)
+{
+    { f(args...) } -> void;
+};
+
 template <typename Future>
 class FutureQueue
 {
@@ -135,6 +141,19 @@ class ThreadPoolAsync
             }
         }
 
+        template <typename Func, typename ...ArgType> requires VoidFunc<Func, ArgType...>
+        void push(Func&& aFunc, ArgType&&... aArgs)
+        {
+            auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);
+
+            auto sWrapper = [mFuncWithArgs{std::move(sFuncWithArgs)}] (void)
+            {
+                mFuncWithArgs();
+            };
+
+            mFutureQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
+        }
+
         template <typename Func, typename ...ArgType>
         auto push(Func&& aFunc, ArgType&&... aArgs) -> std::future<decltype(aFunc(aArgs...))>
         {
@@ -155,7 +174,7 @@ class ThreadPoolAsync
                 }
             };
 
-            mFutureQueue.push(std::move(std::async(std::launch::deferred, std::move(sWrapper))));
+            mFutureQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
 
             return sFuture;
         }
