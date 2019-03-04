@@ -84,7 +84,7 @@ class ThreadPoolAsync
         const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
-        FutureQueue<std::future<int64_t>> mFutureQueue;
+        FutureQueue<std::future<void>> mFutureQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
@@ -139,7 +139,15 @@ class ThreadPoolAsync
         void push(Func&& aFunc, ArgType&&... aArgs)
         {
             auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);
-            mFutureQueue.push(std::async(std::launch::deferred, std::move(sFuncWithArgs)));
+
+            auto sWrapper = [mFuncWithArgs{std::move(sFuncWithArgs)}] (void)
+            {
+                mFuncWithArgs();    // need to pass the return value to the caller, but how?
+            };
+
+            auto sFuture = std::async(std::launch::deferred, sWrapper);
+
+            mFutureQueue.push(std::move(sFuture));
         }
 };
 
