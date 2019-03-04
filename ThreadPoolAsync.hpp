@@ -64,6 +64,41 @@ enum class ThreadState
     RUNNING
 };
 
+class ExecBarrier
+{
+    public:
+        std::atomic<size_t> mCnt;
+        const size_t mThreshold;
+
+        std::mutex mMutex;
+        std::condition_variable mCond;
+
+        ExecBarrier(const size_t aThreshold) : mCnt(0), mThreshold(aThreshold)
+        {
+        }
+
+        ExecBarrier(const ExecBarrier&) = delete;
+        ExecBarrier(ExecBarrier&&) = delete;
+        ExecBarrier& operator=(const ExecBarrier&) = delete;
+        ExecBarrier& operator=(ExecBarrier&&) = delete;
+
+    public:
+        void waitOnArrive(void)
+        {
+            mCnt++;
+            if (mCnt == mThreshold)
+            {
+                mCond.notify_all();
+            }
+            else
+            {
+                using namespace std::chrono_literals;
+                std::unique_lock sBarrierLock(mMutex);
+                mCond.wait(sBarrierLock);
+            }
+        }
+};
+
 class ThreadStruct
 {
     public:
@@ -88,6 +123,8 @@ class ThreadPoolAsync
 {
     private:
         const size_t mThrCnt;
+        ExecBarrier mBarrier;
+
         std::vector<ThreadStruct> mThrList;
 
         FutureQueue<std::future<void>> mFutureQueue;
@@ -95,10 +132,12 @@ class ThreadPoolAsync
         std::mutex mMutex;
         std::condition_variable mCond;
 
+
         bool mRun = true;
+        std::atomic<size_t> mStartCnt = 0;
 
     public:
-        ThreadPoolAsync(const size_t aThrCnt) : mThrCnt(aThrCnt)
+        ThreadPoolAsync(const size_t aThrCnt) : mThrCnt(aThrCnt), mBarrier(aThrCnt + 1)
         {
             mThrList.reserve(aThrCnt);
 
@@ -106,11 +145,13 @@ class ThreadPoolAsync
             {
                 mThrList.emplace_back(&ThreadPoolAsync::threadMain, this);
             }
+
+            mBarrier.waitOnArrive();
         }
 
         void threadMain(ThreadStruct* aStatus)
         {
-            DEBUG("Thread " << std::this_thread::get_id());
+            mBarrier.waitOnArrive();
 
             while (mRun == true)
             {
@@ -123,11 +164,9 @@ class ThreadPoolAsync
                     using namespace std::chrono_literals;
 
                     std::unique_lock sLock(mMutex);
-                    mCond.wait_for(sLock, 600ms, [this]{return (this->mRun == false);});
+                    (void)mCond.wait_for(sLock, 100ms);
                 }
             }
-
-            DEBUG("End " << std::this_thread::get_id());
         }
 
         void stop(void)
@@ -136,7 +175,6 @@ class ThreadPoolAsync
 
             for (auto& sThr : mThrList)
             {
-                DEBUG("Joining " << sThr.mThread.get_id());
                 sThr.mThread.join();
             }
         }
@@ -152,6 +190,8 @@ class ThreadPoolAsync
             };
 
             mFutureQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
+
+            mCond.notify_one();
         }
 
         template <typename Func, typename ...ArgType>
@@ -176,7 +216,10 @@ class ThreadPoolAsync
 
             mFutureQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
 
+            mCond.notify_one();
+
             return sFuture;
         }
+
 };
 

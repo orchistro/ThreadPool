@@ -10,7 +10,7 @@ inline std::mutex gOutMutex;
 
 #define DEBUG(args) do \
 { \
-    std::unique_lock l(gOutMutex); \
+    /* std::unique_lock l(gOutMutex);*/ \
     std::cout << args << "\n"; \
 } while (0)
 

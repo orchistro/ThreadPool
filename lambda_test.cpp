@@ -65,7 +65,7 @@ int32_t main(void)
     std::string s2;
     auto f8 = tp.push(func8, 30, 20, 10, std::ref(s2));
 
-    std::this_thread::sleep_for(10s);
+    // std::this_thread::sleep_for(10s);
 
     tp.stop();
 
