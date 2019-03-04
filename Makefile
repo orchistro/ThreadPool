@@ -2,16 +2,16 @@
 
 .PHONY: all clean
 
-all: lambda_test async_test
+all: build/lambda_test build/async_test
 
 SRCS := $(patsubst ./%,%,$(shell find . -name '*.cpp'))
 DEPS := $(addprefix dep/,$(SRCS:.cpp=.d))
 
-lambda_test: build/lambda_test.o
-	$(CXX) -o build/$@ $^ -lstdc++ -pthread
+build/lambda_test: build/lambda_test.o
+	$(CXX) -o $@ $^ -lstdc++ -pthread
 
-async_test: build/async_test.o
-	$(CXX) -o build/$@ $^ -lstdc++ -pthread
+build/async_test: build/async_test.o
+	$(CXX) -o $@ $^ -lstdc++ -pthread
 
 $(DEPS): dep/%.d: %.cpp
 	@mkdir -p dep
@@ -19,7 +19,7 @@ $(DEPS): dep/%.d: %.cpp
 
 build/%.o: %.cpp
 	@mkdir -p build
-	$(CXX) -std=c++17 -c -g -pthread -O0 -Wall -Werror -o $@ $<
+	$(CXX) -std=c++17 -fconcepts -c -g -pthread -O0 -Wall -Werror -o $@ $<
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPS)
