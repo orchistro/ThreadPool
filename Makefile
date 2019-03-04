@@ -4,20 +4,21 @@
 
 all: lambda_test async_test
 
-SRCS := $(shell find . -name '*.cpp')
-OBJS := $(SRCS:.cpp=.o)
-DEPS := $(SRCS:.cpp=.d)
+SRCS := $(patsubst ./%,%,$($(shell find . -name '*.cpp')))
+DEPS := $(addprefix dep/,$(SRCS:.cpp=.d))
 
-lambda_test: lambda_test.o
-	$(CXX) -o $@ $^ -lstdc++ -pthread
+lambda_test: build/lambda_test.o
+	$(CXX) -o build/$@ $^ -lstdc++ -pthread
 
-async_test: async_test.o
-	$(CXX) -o $@ $^ -lstdc++ -pthread
+async_test: build/async_test.o
+	$(CXX) -o build/$@ $^ -lstdc++ -pthread
 
-$(DEPS): %.d: %.cpp
-	$(CXX) -std=c++17 -MM -MT $(@:%.d=%.o) $< > $@
+$(DEPS): dep/%.d: %.cpp
+	@mkdir -p dep
+	$(CXX) -std=c++17 -MM -MT $(@:dep/%.d=build/%.o) $< > $@
 
-%.o: %.cpp
+build/%.o: %.cpp
+	@mkdir -p build
 	$(CXX) -std=c++17 -c -g -pthread -O0 -Wall -Werror -o $@ $<
 
 ifneq ($(MAKECMDGOALS), clean)
@@ -25,5 +26,5 @@ ifneq ($(MAKECMDGOALS), clean)
 endif
 
 clean:
-	rm -rf lambda_test *.o *.d
-	rm -rf core.*
+	rm -rf dep
+	rm -rf build

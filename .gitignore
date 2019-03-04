@@ -1,4 +1,6 @@
 .*.sw*
 *.o
 *.d
-foo
+
+build/
+dep/
