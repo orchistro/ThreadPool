@@ -84,7 +84,7 @@ class ThreadStruct
         ThreadStruct& operator=(ThreadStruct&&) = default;
 };
 
-class ThreadPool
+class ThreadPoolLambda
 {
     private:
         const size_t mThrCnt;
