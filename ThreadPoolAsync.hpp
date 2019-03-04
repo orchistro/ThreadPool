@@ -136,18 +136,28 @@ class ThreadPoolAsync
         }
 
         template <typename Func, typename ...ArgType>
-        void push(Func&& aFunc, ArgType&&... aArgs)
+        auto push(Func&& aFunc, ArgType&&... aArgs) -> std::future<decltype(aFunc(aArgs...))>
         {
+            std::promise<decltype(aFunc(aArgs...))> sPromise;
+            auto sFuture = sPromise.get_future();
+
             auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);
 
-            auto sWrapper = [mFuncWithArgs{std::move(sFuncWithArgs)}] (void)
+            auto sWrapper = [mFuncWithArgs{std::move(sFuncWithArgs)}, mPromise{std::move(sPromise)}] (void) mutable
             {
-                mFuncWithArgs();    // need to pass the return value to the caller, but how?
+                if constexpr (std::is_void_v<decltype(aFunc(aArgs...))> == true)
+                {
+                    mFuncWithArgs();
+                }
+                else
+                {
+                    mPromise.set_value(mFuncWithArgs());
+                }
             };
 
-            auto sFuture = std::async(std::launch::deferred, sWrapper);
+            mFutureQueue.push(std::move(std::async(std::launch::deferred, std::move(sWrapper))));
 
-            mFutureQueue.push(std::move(sFuture));
+            return sFuture;
         }
 };
 
