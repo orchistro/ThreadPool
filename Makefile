@@ -2,13 +2,16 @@
 
 .PHONY: all clean
 
-all: foo
+all: lambda_test async_test
 
 SRCS := $(shell find . -name '*.cpp')
 OBJS := $(SRCS:.cpp=.o)
 DEPS := $(SRCS:.cpp=.d)
 
-foo: $(OBJS)
+lambda_test: lambda_test.o
+	$(CXX) -o $@ $^ -lstdc++ -pthread
+
+async_test: async_test.o
 	$(CXX) -o $@ $^ -lstdc++ -pthread
 
 $(DEPS): %.d: %.cpp
@@ -22,5 +25,5 @@ ifneq ($(MAKECMDGOALS), clean)
 endif
 
 clean:
-	rm -rf foo *.o *.d
+	rm -rf lambda_test *.o *.d
 	rm -rf core.*

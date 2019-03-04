@@ -20,11 +20,11 @@
 
 #include "debug.hpp"
 
-template <typename Task>
-class TaskQueue
+template <typename Future>
+class FutureQueue
 {
     public:
-        std::optional<Task> pop(void)
+        std::optional<Future> pop(void)
         {
             std::unique_lock sLock(mMutex);
 
@@ -34,21 +34,21 @@ class TaskQueue
             }
             else
             {
-                auto sTask = std::move(mQueue.front());
+                auto sFuture = std::move(mQueue.front());
                 mQueue.pop();
-                return sTask;
+                return std::optional<Future>(std::move(sFuture));
             }
         }
 
-        void push(Task&& aTask)
+        void push(Future&& aFuture)
         {
             std::unique_lock sLock(mMutex);
 
-            mQueue.push(std::forward<Task>(aTask));
+            mQueue.push(std::forward<Future>(aFuture));
         }
 
     private:
-        std::queue<Task> mQueue;
+        std::queue<Future> mQueue;
         std::mutex mMutex;
 };
 
@@ -78,29 +78,27 @@ class ThreadStruct
         ThreadStruct& operator=(ThreadStruct&&) = default;
 };
 
-class ThreadPoolLambda
+class ThreadPoolAsync
 {
     private:
         const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
-        TaskQueue<std::function<void(void)>> mTaskQueue;
+        FutureQueue<std::future<int64_t>> mFutureQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
 
-        bool mRun = true;  // asuming it is ok not to be atomic.
-
-        std::atomic<size_t> mRunningCnt = 0;
+        bool mRun = true;
 
     public:
-        ThreadPoolLambda(const size_t aThrCnt) : mThrCnt(aThrCnt)
+        ThreadPoolAsync(const size_t aThrCnt) : mThrCnt(aThrCnt)
         {
             mThrList.reserve(aThrCnt);
 
             for (size_t i = 0; i < aThrCnt; i++)
             {
-                mThrList.emplace_back(&ThreadPoolLambda::threadMain, this);
+                mThrList.emplace_back(&ThreadPoolAsync::threadMain, this);
             }
         }
 
@@ -110,13 +108,9 @@ class ThreadPoolLambda
 
             while (mRun == true)
             {
-                if (auto sTaskWrapper = mTaskQueue.pop(); sTaskWrapper.has_value() == true)
+                if (auto sFuture = mFutureQueue.pop(); sFuture.has_value() == true)
                 {
-                    aStatus->mState = ThreadState::RUNNING;
-                    mRunningCnt++;
-                    (*sTaskWrapper)();
-                    mRunningCnt--;
-                    aStatus->mState = ThreadState::IDLE;
+                    sFuture.value().get();
                 }
                 else
                 {
@@ -130,12 +124,6 @@ class ThreadPoolLambda
             DEBUG("End " << std::this_thread::get_id());
         }
 
-        ThreadPoolLambda(const ThreadPoolLambda&) = delete;
-        ThreadPoolLambda(ThreadPoolLambda&&) = delete;
-
-        ThreadPoolLambda& operator=(const ThreadPoolLambda&) = delete;
-        ThreadPoolLambda& operator=(ThreadPoolLambda&&) = delete;
-
         void stop(void)
         {
             mRun = false;
@@ -147,36 +135,8 @@ class ThreadPoolLambda
             }
         }
 
-        template <typename Func, typename ...ArgType>
-        auto push(Func&& aFunc, ArgType&&... aArgs) -> std::future<decltype(aFunc(aArgs...))>
+        void push(std::function<int64_t(void)>&& aFunc)
         {
-            auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);
-
-            // Need to use shared_ptr to avoid compile error in clang:
-            // https://bugs.llvm.org/show_bug.cgi?id=38325
-            auto sPackage = std::make_shared<std::packaged_task<decltype(aFunc(aArgs...))(void)>>(std::move(sFuncWithArgs));
-            auto sFuture{sPackage->get_future()};
-
-            auto sTaskWrapper = [sPackage](void) -> void { (*sPackage)(); };
-
-            mTaskQueue.push(std::move(sTaskWrapper));
-            mCond.notify_one();
-
-            return sFuture;
-        }
-
-        const size_t size(void) const
-        {
-            return mThrCnt;
-        }
-
-        const size_t getIdleCount(void) const
-        {
-            return mThrCnt - mRunningCnt;
-        }
-        const size_t getRunningCount(void) const
-        {
-            return mRunningCnt;
+            mFutureQueue.push(std::async(std::launch::deferred, aFunc));
         }
 };
-

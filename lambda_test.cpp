@@ -1,6 +1,6 @@
 #include <chrono>
 
-#include "ThreadPool.hpp"
+#include "ThreadPoolLambda.hpp"
 
 static std::string func4(int32_t a, int32_t b)
 {
@@ -33,11 +33,11 @@ static int64_t func8(int32_t a, int32_t b, int32_t c, std::string& aOutputStr)
     return res;
 }
 
-int main(void)
+int32_t main(void)
 {
     using namespace std::chrono_literals;
 
-    ThreadPool tp(3);
+    ThreadPoolLambda tp(3);
 
     auto lambda1 = [](int64_t id) -> int64_t
     {
