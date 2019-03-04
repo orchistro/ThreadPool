@@ -135,8 +135,11 @@ class ThreadPoolAsync
             }
         }
 
-        void push(std::function<int64_t(void)>&& aFunc)
+        template <typename Func, typename ...ArgType>
+        void push(Func&& aFunc, ArgType&&... aArgs)
         {
-            mFutureQueue.push(std::async(std::launch::deferred, aFunc));
+            auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);
+            mFutureQueue.push(std::async(std::launch::deferred, std::move(sFuncWithArgs)));
         }
 };
+

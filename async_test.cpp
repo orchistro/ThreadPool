@@ -2,20 +2,21 @@
 
 #include "ThreadPoolAsync.hpp"
 
-int64_t func1(void)
+using namespace std::chrono_literals;
+
+int64_t func1(const int32_t a, const int32_t b)
 {
-    DEBUG("func1");
+    DEBUG("func1(" << pthread_self() << ")" << "a:" << a << " b:" << b);
+    std::this_thread::sleep_for(5s);
     return 100;
 }
 
 int32_t main(void)
 {
-    using namespace std::chrono_literals;
-
     ThreadPoolAsync sThreadPool(3);
 
-    sThreadPool.push(func1);
-    sThreadPool.push([]()->int64_t {DEBUG("lambda1"); return 200;});
+    sThreadPool.push(func1, 10, 20);
+    sThreadPool.push([](void)->int64_t {DEBUG("lambda1(" << pthread_self() << ")"); return 200;});
 
     std::this_thread::sleep_for(2s);
 
