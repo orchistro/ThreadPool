@@ -4,7 +4,7 @@
 
 all: lambda_test async_test
 
-SRCS := $(patsubst ./%,%,$($(shell find . -name '*.cpp')))
+SRCS := $(patsubst ./%,%,$(shell find . -name '*.cpp'))
 DEPS := $(addprefix dep/,$(SRCS:.cpp=.d))
 
 lambda_test: build/lambda_test.o
