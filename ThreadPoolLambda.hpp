@@ -19,64 +19,8 @@
 #include <pthread.h>
 
 #include "debug.hpp"
-
-template <typename Task>
-class TaskQueue
-{
-    public:
-        std::optional<Task> pop(void)
-        {
-            std::unique_lock sLock(mMutex);
-
-            if (mQueue.empty() == true)
-            {
-                return std::nullopt;
-            }
-            else
-            {
-                auto sTask = std::move(mQueue.front());
-                mQueue.pop();
-                return sTask;
-            }
-        }
-
-        void push(Task&& aTask)
-        {
-            std::unique_lock sLock(mMutex);
-
-            mQueue.push(std::forward<Task>(aTask));
-        }
-
-    private:
-        std::queue<Task> mQueue;
-        std::mutex mMutex;
-};
-
-enum class ThreadState
-{
-    IDLE,
-    RUNNING
-};
-
-class ThreadStruct
-{
-    public:
-        std::thread mThread;
-        ThreadState mState = ThreadState::IDLE;
-
-    public:
-        template <typename Func, typename... Args>
-        ThreadStruct(Func&& aFunc, Args&&... aArgs)
-            : mThread(std::forward<Func>(aFunc), std::forward<Args>(aArgs)..., this)
-        {
-        }
-
-        ThreadStruct(const ThreadStruct&) = delete;
-        ThreadStruct& operator=(const ThreadStruct&) = delete;
-
-        ThreadStruct(ThreadStruct&&) = default;
-        ThreadStruct& operator=(ThreadStruct&&) = default;
-};
+#include "MyQueue.hpp"
+#include "ThreadStruct.hpp"
 
 class ThreadPoolLambda
 {
@@ -84,7 +28,7 @@ class ThreadPoolLambda
         const size_t mThrCnt;
         std::vector<ThreadStruct> mThrList;
 
-        TaskQueue<std::function<void(void)>> mTaskQueue;
+        MyQueue<std::function<void(void)>> mTaskQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
@@ -112,11 +56,11 @@ class ThreadPoolLambda
             {
                 if (auto sTaskWrapper = mTaskQueue.pop(); sTaskWrapper.has_value() == true)
                 {
-                    aStatus->mState = ThreadState::RUNNING;
+                    aStatus->mState = ThreadStruct::State::RUNNING;
                     mRunningCnt++;
                     (*sTaskWrapper)();
                     mRunningCnt--;
-                    aStatus->mState = ThreadState::IDLE;
+                    aStatus->mState = ThreadStruct::State::IDLE;
                 }
                 else
                 {

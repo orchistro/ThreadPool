@@ -7,7 +7,6 @@
 #include <thread>
 #include <vector>
 #include <iostream>
-#include <queue>
 #include <optional>
 #include <mutex>
 #include <functional>
@@ -19,49 +18,13 @@
 #include <pthread.h>
 
 #include "debug.hpp"
+#include "ThreadStruct.hpp"
+#include "MyQueue.hpp"
 
 template <typename Func, typename ...Args>
-concept bool VoidFunc = requires(Func f, Args... args)
+concept bool VoidFunc = requires(Func aFunc, Args... aArgs)
 {
-    { f(args...) } -> void;
-};
-
-template <typename Future>
-class FutureQueue
-{
-    public:
-        std::optional<Future> pop(void)
-        {
-            std::unique_lock sLock(mMutex);
-
-            if (mQueue.empty() == true)
-            {
-                return std::nullopt;
-            }
-            else
-            {
-                auto sFuture = std::move(mQueue.front());
-                mQueue.pop();
-                return std::optional<Future>(std::move(sFuture));
-            }
-        }
-
-        void push(Future&& aFuture)
-        {
-            std::unique_lock sLock(mMutex);
-
-            mQueue.push(std::forward<Future>(aFuture));
-        }
-
-    private:
-        std::queue<Future> mQueue;
-        std::mutex mMutex;
-};
-
-enum class ThreadState
-{
-    IDLE,
-    RUNNING
+    { aFunc(aArgs...) } -> void;
 };
 
 class ExecBarrier
@@ -99,26 +62,6 @@ class ExecBarrier
         }
 };
 
-class ThreadStruct
-{
-    public:
-        std::thread mThread;
-        ThreadState mState = ThreadState::IDLE;
-
-    public:
-        template <typename Func, typename... Args>
-        ThreadStruct(Func&& aFunc, Args&&... aArgs)
-            : mThread(std::forward<Func>(aFunc), std::forward<Args>(aArgs)..., this)
-        {
-        }
-
-        ThreadStruct(const ThreadStruct&) = delete;
-        ThreadStruct& operator=(const ThreadStruct&) = delete;
-
-        ThreadStruct(ThreadStruct&&) = default;
-        ThreadStruct& operator=(ThreadStruct&&) = default;
-};
-
 class ThreadPoolAsync
 {
     private:
@@ -127,7 +70,7 @@ class ThreadPoolAsync
 
         std::vector<ThreadStruct> mThrList;
 
-        FutureQueue<std::future<void>> mFutureQueue;
+        MyQueue<std::future<void>> mFutureQueue;
 
         std::mutex mMutex;
         std::condition_variable mCond;
@@ -164,7 +107,7 @@ class ThreadPoolAsync
                     using namespace std::chrono_literals;
 
                     std::unique_lock sLock(mMutex);
-                    (void)mCond.wait_for(sLock, 100ms);
+                    (void)mCond.wait_for(sLock, 100ms); // no need to prevent spurious wakeups, let it happen
                 }
             }
         }
