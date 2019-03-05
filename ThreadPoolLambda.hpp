@@ -4,74 +4,18 @@
 
 #pragma once
 
-#include <thread>
-#include <vector>
-#include <iostream>
-#include <queue>
-#include <optional>
-#include <mutex>
 #include <functional>
 #include <condition_variable>
-#include <atomic>
 #include <cstdint>
 #include <future>
 
-#include <pthread.h>
+#include "ThreadPool.hpp"
 
-#include "debug.hpp"
-#include "MyQueue.hpp"
-#include "ThreadStruct.hpp"
-
-class ThreadPoolLambda
+class ThreadPoolLambda final : public ThreadPool<std::function<void(void)>>
 {
-    private:
-        const size_t mThrCnt;
-        std::vector<ThreadStruct> mThrList;
-
-        MyQueue<std::function<void(void)>> mTaskQueue;
-
-        std::mutex mMutex;
-        std::condition_variable mCond;
-
-        bool mRun = true;  // asuming it is ok not to be atomic.
-
-        std::atomic<size_t> mRunningCnt = 0;
-
     public:
-        ThreadPoolLambda(const size_t aThrCnt) : mThrCnt(aThrCnt)
+        ThreadPoolLambda(const size_t aThrCnt) : ThreadPool<std::function<void(void)>>(aThrCnt)
         {
-            mThrList.reserve(aThrCnt);
-
-            for (size_t i = 0; i < aThrCnt; i++)
-            {
-                mThrList.emplace_back(&ThreadPoolLambda::threadMain, this);
-            }
-        }
-
-        void threadMain(ThreadStruct* aStatus)
-        {
-            DEBUG("Thread " << std::this_thread::get_id());
-
-            while (mRun == true)
-            {
-                if (auto sTaskWrapper = mTaskQueue.pop(); sTaskWrapper.has_value() == true)
-                {
-                    aStatus->mState = ThreadStruct::State::RUNNING;
-                    mRunningCnt++;
-                    (*sTaskWrapper)();
-                    mRunningCnt--;
-                    aStatus->mState = ThreadStruct::State::IDLE;
-                }
-                else
-                {
-                    using namespace std::chrono_literals;
-
-                    std::unique_lock sLock(mMutex);
-                    mCond.wait_for(sLock, 600ms, [this]{return (this->mRun == false);});
-                }
-            }
-
-            DEBUG("End " << std::this_thread::get_id());
         }
 
         ThreadPoolLambda(const ThreadPoolLambda&) = delete;
@@ -80,15 +24,9 @@ class ThreadPoolLambda
         ThreadPoolLambda& operator=(const ThreadPoolLambda&) = delete;
         ThreadPoolLambda& operator=(ThreadPoolLambda&&) = delete;
 
-        void stop(void)
+        void executeTask(std::optional<std::function<void(void)>>&& aFunc) const override
         {
-            mRun = false;
-
-            for (auto& sThr : mThrList)
-            {
-                DEBUG("Joining " << sThr.mThread.get_id());
-                sThr.mThread.join();
-            }
+            aFunc.value()();
         }
 
         template <typename Func, typename ...ArgType>
@@ -103,24 +41,11 @@ class ThreadPoolLambda
 
             auto sTaskWrapper = [sPackage](void) -> void { (*sPackage)(); };
 
-            mTaskQueue.push(std::move(sTaskWrapper));
+            mQueue.push(std::move(sTaskWrapper));
+
             mCond.notify_one();
 
             return sFuture;
-        }
-
-        const size_t size(void) const
-        {
-            return mThrCnt;
-        }
-
-        const size_t getIdleCount(void) const
-        {
-            return mThrCnt - mRunningCnt;
-        }
-        const size_t getRunningCount(void) const
-        {
-            return mRunningCnt;
         }
 };
 

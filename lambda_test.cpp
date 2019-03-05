@@ -67,8 +67,6 @@ int32_t main(void)
 
     // std::this_thread::sleep_for(10s);
 
-    tp.stop();
-
     DEBUG("f1:" << f1.get());
     DEBUG("f2:" << f2.get());
     DEBUG("f3:" << f3.get());
@@ -78,6 +76,8 @@ int32_t main(void)
     DEBUG("f7:" << f7.get());
     DEBUG("f8:" << f8.get());
     DEBUG("s2:" << s2);
+
+    tp.stop();
 
     return 0;
 }

@@ -4,22 +4,12 @@
 
 #pragma once
 
-#include <thread>
-#include <vector>
-#include <iostream>
-#include <optional>
-#include <mutex>
 #include <functional>
 #include <condition_variable>
-#include <atomic>
 #include <cstdint>
 #include <future>
 
-#include <pthread.h>
-
-#include "debug.hpp"
-#include "ThreadStruct.hpp"
-#include "MyQueue.hpp"
+#include "ThreadPool.hpp"
 
 template <typename Func, typename ...Args>
 concept bool VoidFunc = requires(Func aFunc, Args... aArgs)
@@ -27,99 +17,22 @@ concept bool VoidFunc = requires(Func aFunc, Args... aArgs)
     { aFunc(aArgs...) } -> void;
 };
 
-class ExecBarrier
+class ThreadPoolAsync final : public ThreadPool<std::future<void>>
 {
     public:
-        std::atomic<size_t> mCnt;
-        const size_t mThreshold;
-
-        std::mutex mMutex;
-        std::condition_variable mCond;
-
-        ExecBarrier(const size_t aThreshold) : mCnt(0), mThreshold(aThreshold)
+        ThreadPoolAsync(const size_t aThrCnt) : ThreadPool<std::future<void>>(aThrCnt)
         {
         }
 
-        ExecBarrier(const ExecBarrier&) = delete;
-        ExecBarrier(ExecBarrier&&) = delete;
-        ExecBarrier& operator=(const ExecBarrier&) = delete;
-        ExecBarrier& operator=(ExecBarrier&&) = delete;
+        ThreadPoolAsync(const ThreadPoolAsync&) = delete;
+        ThreadPoolAsync(ThreadPoolAsync&&) = delete;
 
-    public:
-        void waitOnArrive(void)
+        ThreadPoolAsync& operator=(const ThreadPoolAsync&) = delete;
+        ThreadPoolAsync& operator=(ThreadPoolAsync&&) = delete;
+
+        void executeTask(std::optional<std::future<void>>&& aFuture) const override
         {
-            mCnt++;
-            if (mCnt == mThreshold)
-            {
-                mCond.notify_all();
-            }
-            else
-            {
-                using namespace std::chrono_literals;
-                std::unique_lock sBarrierLock(mMutex);
-                mCond.wait(sBarrierLock);
-            }
-        }
-};
-
-class ThreadPoolAsync
-{
-    private:
-        const size_t mThrCnt;
-        ExecBarrier mBarrier;
-
-        std::vector<ThreadStruct> mThrList;
-
-        MyQueue<std::future<void>> mFutureQueue;
-
-        std::mutex mMutex;
-        std::condition_variable mCond;
-
-
-        bool mRun = true;
-        std::atomic<size_t> mStartCnt = 0;
-
-    public:
-        ThreadPoolAsync(const size_t aThrCnt) : mThrCnt(aThrCnt), mBarrier(aThrCnt + 1)
-        {
-            mThrList.reserve(aThrCnt);
-
-            for (size_t i = 0; i < aThrCnt; i++)
-            {
-                mThrList.emplace_back(&ThreadPoolAsync::threadMain, this);
-            }
-
-            mBarrier.waitOnArrive();
-        }
-
-        void threadMain(ThreadStruct* aStatus)
-        {
-            mBarrier.waitOnArrive();
-
-            while (mRun == true)
-            {
-                if (auto sFuture = mFutureQueue.pop(); sFuture.has_value() == true)
-                {
-                    sFuture.value().get();
-                }
-                else
-                {
-                    using namespace std::chrono_literals;
-
-                    std::unique_lock sLock(mMutex);
-                    (void)mCond.wait_for(sLock, 100ms); // no need to prevent spurious wakeups, let it happen
-                }
-            }
-        }
-
-        void stop(void)
-        {
-            mRun = false;
-
-            for (auto& sThr : mThrList)
-            {
-                sThr.mThread.join();
-            }
+            aFuture.value().get();
         }
 
         template <typename Func, typename ...ArgType> requires VoidFunc<Func, ArgType...>
@@ -132,7 +45,7 @@ class ThreadPoolAsync
                 mFuncWithArgs();
             };
 
-            mFutureQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
+            mQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
 
             mCond.notify_one();
         }
@@ -150,12 +63,11 @@ class ThreadPoolAsync
                 mPromise.set_value(mFuncWithArgs());
             };
 
-            mFutureQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
+            mQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
 
             mCond.notify_one();
 
             return sFuture;
         }
-
 };
 

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <mutex>
+#include <iostream>
 
 inline std::mutex gOutMutex;
 
