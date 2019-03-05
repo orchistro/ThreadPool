@@ -53,7 +53,9 @@ class ThreadPoolAsync final : public ThreadPool<std::future<void>>
         template <typename Func, typename ...ArgType>
         auto push(Func&& aFunc, ArgType&&... aArgs) -> std::future<decltype(aFunc(aArgs...))>
         {
-            std::promise<decltype(aFunc(aArgs...))> sPromise;
+            using RetType = decltype(aFunc(aArgs...));
+
+            std::promise<RetType> sPromise;
             auto sFuture = sPromise.get_future();
 
             auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);

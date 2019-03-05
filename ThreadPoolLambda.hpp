@@ -57,11 +57,13 @@ class ThreadPoolLambda final : public ThreadPool<TaskObjType>
         template <typename Func, typename ...ArgType>
         auto push(Func&& aFunc, ArgType&&... aArgs) -> std::future<decltype(aFunc(aArgs...))>
         {
-            auto sFuncWithArgs = std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...);
-            auto sPackage = std::packaged_task<decltype(aFunc(aArgs...))(void)>(std::move(sFuncWithArgs));
+            using RetType = decltype(aFunc(aArgs...));
+            using PkgType = std::packaged_task<RetType(void)>;
+
+            auto sFuncWithArgs{std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...)};
+            auto sPackage{PkgType(std::move(sFuncWithArgs))};
             auto sFuture{sPackage.get_future()};
-            auto sTaskWrapper =
-                std::make_unique<TaskWrapper<std::packaged_task<decltype(aFunc(aArgs...))(void)>>>(std::move(sPackage));
+            auto sTaskWrapper{std::make_unique<TaskWrapper<PkgType>>(std::move(sPackage))};
 
             mQueue.push(std::move(sTaskWrapper));
 
