@@ -147,14 +147,7 @@ class ThreadPoolAsync
 
             auto sWrapper = [mFuncWithArgs{std::move(sFuncWithArgs)}, mPromise{std::move(sPromise)}] (void) mutable
             {
-                if constexpr (std::is_void_v<decltype(aFunc(aArgs...))> == true)
-                {
-                    mFuncWithArgs();
-                }
-                else
-                {
-                    mPromise.set_value(mFuncWithArgs());
-                }
+                mPromise.set_value(mFuncWithArgs());
             };
 
             mFutureQueue.push(std::async(std::launch::deferred, std::move(sWrapper)));
