@@ -81,7 +81,6 @@ class ThreadPool
 
             for (auto& sThr : mThrList)
             {
-                DEBUG("Joining " << sThr.mThread.get_id());
                 sThr.mThread.join();
             }
         }

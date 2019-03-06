@@ -61,7 +61,7 @@ class ThreadPoolLambda final : public ThreadPool<TaskObjType>
             using PkgType = std::packaged_task<RetType(void)>;
 
             auto sFuncWithArgs{std::bind(std::forward<Func>(aFunc), std::forward<ArgType>(aArgs)...)};
-            auto sPackage{PkgType(std::move(sFuncWithArgs))};
+            auto sPackage{PkgType(std::move(sFuncWithArgs))};   // BUGBUG: valgrind tells that sPackage is leaking
             auto sFuture{sPackage.get_future()};
             auto sTaskWrapper{std::make_unique<TaskWrapper<PkgType>>(std::move(sPackage))};
 
