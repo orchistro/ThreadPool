@@ -15,6 +15,7 @@
 struct ITaskWrapper
 {
     virtual void operator()(void) = 0;
+    virtual ~ITaskWrapper(void) = default;
 };
 
 template <typename Func>
