@@ -53,9 +53,9 @@ void task(std::vector<size_t>* aVector, const size_t aId)
 }
 
 template <typename TP>
-static void test_body(const size_t aPoolSize, std::vector<size_t>* aWhiteBoardVector, const std::vector<size_t>& aUniqueIdList)
+static void test_body(const bool aAffinity, const size_t aPoolSize, std::vector<size_t>* aWhiteBoardVector, const std::vector<size_t>& aUniqueIdList)
 {
-    TP sPool(aPoolSize);
+    TP sPool(aPoolSize, aAffinity);
 
     for (const auto sId : aUniqueIdList)
     {
@@ -69,24 +69,25 @@ int32_t main(const int32_t aArgc, const char* aArgv[])
 {
     if (aArgc == 1)
     {
-        std::cout << "Usage: perf_test CNT POOLSIZE (lambda|async)\n";
+        std::cout << "Usage: perf_test CNT POOLSIZE AFFINITY (lambda|async)\n";
         exit(0);
     }
 
     size_t sCnt = std::atoll(aArgv[1]);
     size_t sPoolSize = std::atoll(aArgv[2]);
-    std::string sMethod{aArgv[3]};
+    bool sAffinity = std::atoll(aArgv[3]);
+    std::string sMethod{aArgv[4]};
 
     std::vector<size_t> sWhiteBoardVector(sCnt, 0L);    // prepare sCnt 0-initialized vector
     std::vector<size_t> sIdList{gen_unique_distrubitud_vector(sCnt)};
 
     if (sMethod == "lambda")
     {
-        test_body<ThreadPoolLambda>(sPoolSize, &sWhiteBoardVector, sIdList);
+        test_body<ThreadPoolLambda>(sAffinity, sPoolSize, &sWhiteBoardVector, sIdList);
     }
     else if (sMethod == "async")
     {
-        test_body<ThreadPoolAsync>(sPoolSize, &sWhiteBoardVector, sIdList);
+        test_body<ThreadPoolAsync>(sAffinity, sPoolSize, &sWhiteBoardVector, sIdList);
     }
 
     if (check_white_board(sWhiteBoardVector) == true)

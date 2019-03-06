@@ -20,7 +20,7 @@ concept bool VoidFunc = requires(Func aFunc, Args... aArgs)
 class ThreadPoolAsync final : public ThreadPool<std::future<void>>
 {
     public:
-        ThreadPoolAsync(const size_t aThrCnt) : ThreadPool<std::future<void>>(aThrCnt)
+        ThreadPoolAsync(const size_t aThrCnt, const bool aAffinity = false) : ThreadPool<std::future<void>>(aThrCnt, aAffinity)
         {
         }
 

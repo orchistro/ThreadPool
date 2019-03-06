@@ -40,7 +40,7 @@ using TaskObjType = std::unique_ptr<ITaskWrapper>;
 class ThreadPoolLambda final : public ThreadPool<TaskObjType>
 {
     public:
-        ThreadPoolLambda(const size_t aThrCnt) : ThreadPool<TaskObjType>(aThrCnt)
+        ThreadPoolLambda(const size_t aThrCnt, const bool aAffinity = false) : ThreadPool<TaskObjType>(aThrCnt, aAffinity)
         {
         }
 
