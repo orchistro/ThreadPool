@@ -67,6 +67,12 @@ static void test_body(const size_t aPoolSize, std::vector<size_t>* aWhiteBoardVe
 
 int32_t main(const int32_t aArgc, const char* aArgv[])
 {
+    if (aArgc == 1)
+    {
+        std::cout << "Usage: perf_test CNT POOLSIZE (lambda|async)\n";
+        exit(0);
+    }
+
     size_t sCnt = std::atoll(aArgv[1]);
     size_t sPoolSize = std::atoll(aArgv[2]);
     std::string sMethod{aArgv[3]};
