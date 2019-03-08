@@ -77,23 +77,26 @@ class ThreadPool
         {
             mBarrier.waitOnArrive();
 
-            while (mRun == true)
+            while (true)
             {
                 if (auto sElem = mQueue.pop(); sElem.has_value() == true)
                 {
                     executeTask(std::move(sElem));
-                    std::this_thread::yield();
                 }
                 else
                 {
-                    using namespace std::chrono_literals;
-                    std::unique_lock sLock(mMutex);
-                    (void)mCond.wait_for(sLock, 100ms); // no need to prevent spurious wakeups, let it happen
+                    if (mRun == false)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        using namespace std::chrono_literals;
+                        std::unique_lock sLock(mMutex);
+                        (void)mCond.wait_for(sLock, 100ms); // no need to prevent spurious wakeups, let it happen
+                    }
                 }
             }
-
-            // TODO: Need to work on the case where mRun is set to false while mQueue is NOT empty
-            //       In other words, need to process remaining queue elements.
         }
 
         void stop(void)

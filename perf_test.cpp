@@ -53,41 +53,69 @@ void task(std::vector<size_t>* aVector, const size_t aId)
 }
 
 template <typename TP>
-static void test_body(const bool aAffinity, const size_t aPoolSize, std::vector<size_t>* aWhiteBoardVector, const std::vector<size_t>& aUniqueIdList)
+static void test_core(TP* aPool, std::vector<size_t>* aWhiteBoardVector, const std::vector<size_t>* aUniqueIdList, const size_t aStart, const size_t aCnt)
+{
+    std::cout << "test_core start:" << aStart << ",cnt:" << aCnt << "\n";
+    for (size_t i = 0; i < aCnt; i++)
+    {
+        (void)aPool->push(task, aWhiteBoardVector, (*aUniqueIdList)[aStart + i]);
+    }
+    std::cout << "---> test_core start:" << aStart << ",cnt:" << aCnt << "\n";
+}
+
+template <typename TP>
+static void test(const size_t aEnquerCnt, const bool aAffinity, const size_t aPoolSize, std::vector<size_t>* aWhiteBoardVector, const std::vector<size_t>& aUniqueIdList)
 {
     TP sPool(aPoolSize, aAffinity);
 
-    for (const auto sId : aUniqueIdList)
+    std::vector<std::thread> sThreadList;
+    sThreadList.reserve(aEnquerCnt);
+
+    size_t sStart = 0;
+    size_t sUnit = aUniqueIdList.size() / aEnquerCnt;
+    size_t sRemaining = aUniqueIdList.size() % aEnquerCnt;
+
+    for (size_t i = 0; i < aEnquerCnt; i++)
     {
-        (void)sPool.push(task, aWhiteBoardVector, sId);
+        size_t sCnt = (i == 0) ? sUnit + sRemaining : sUnit;
+        sThreadList.emplace_back(test_core<TP>, &sPool, aWhiteBoardVector, &aUniqueIdList, sStart, sCnt);
+        sStart += sCnt;
     }
 
+    for (auto& sThr : sThreadList)
+    {
+        sThr.join();
+    }
+
+    std::cout << "Stopping pool\n";
     sPool.stop();
+    std::cout << "Stopping pool done\n";
 }
 
 int32_t main(const int32_t aArgc, const char* aArgv[])
 {
     if (aArgc == 1)
     {
-        std::cout << "Usage: perf_test CNT POOLSIZE AFFINITY (lambda|async)\n";
+        std::cout << "Usage: perf_test DATA_CNT ENQUERCNT POOLSIZE AFFINITY (lambda|async)\n";
         exit(0);
     }
 
-    size_t sCnt = std::atoll(aArgv[1]);
-    size_t sPoolSize = std::atoll(aArgv[2]);
-    bool sAffinity = std::atoll(aArgv[3]);
-    std::string sMethod{aArgv[4]};
+    size_t sDataCnt = std::atoll(aArgv[1]);
+    size_t sEnquerCnt = std::atoll(aArgv[2]);
+    size_t sPoolSize = std::atoll(aArgv[3]);
+    bool sAffinity = std::atoll(aArgv[4]);
+    std::string sMethod{aArgv[5]};
 
-    std::vector<size_t> sWhiteBoardVector(sCnt, 0L);    // prepare sCnt 0-initialized vector
-    std::vector<size_t> sIdList{gen_unique_distrubitud_vector(sCnt)};
+    std::vector<size_t> sWhiteBoardVector(sDataCnt, 0L);    // prepare sDataCnt 0-initialized vector
+    std::vector<size_t> sIdList{gen_unique_distrubitud_vector(sDataCnt)};
 
     if (sMethod == "lambda")
     {
-        test_body<ThreadPoolLambda>(sAffinity, sPoolSize, &sWhiteBoardVector, sIdList);
+        test<ThreadPoolLambda>(sEnquerCnt, sAffinity, sPoolSize, &sWhiteBoardVector, sIdList);
     }
     else if (sMethod == "async")
     {
-        test_body<ThreadPoolAsync>(sAffinity, sPoolSize, &sWhiteBoardVector, sIdList);
+        test<ThreadPoolAsync>(sEnquerCnt, sAffinity, sPoolSize, &sWhiteBoardVector, sIdList);
     }
 
     if (check_white_board(sWhiteBoardVector) == true)
